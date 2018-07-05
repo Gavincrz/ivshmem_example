@@ -10,14 +10,31 @@
 
 static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
+  int ret = 0;
   printk(KERN_DEBUG "Probe function get called\n");
+
+  // print some info for experiments
   // print pci revision
+  // using qemu version lower than 2.6 will read 0, otherwise 1
   printk(KERN_INFO "The device revision is %u\n", dev->revision);
+
+  // print BAR0,1,2 addresses
+  unsigned int bar0, bar1, bar2;
+  if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_0, &bar0))
+    return ret;
+  printk(KERN_INFO "BAR0: %08x", bar0);
+  if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_1, &bar1))
+    return ret;
+  printk(KERN_INFO "BAR1: %08x", bar1);
+  if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_2, &bar2))
+    return ret;
+  printk(KERN_INFO "BAR2: %08x", bar2);
+
   // enable the PCI device
   if (pci_enable_device(dev))
     return -ENODEV;
   printk(KERN_DEBUG "Successfully enable the device\n");
-  return 0;
+  return ret;
 }
 
 static void ivshmem_remove(struct pci_dev *dev)
