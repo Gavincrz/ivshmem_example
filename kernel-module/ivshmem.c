@@ -11,6 +11,8 @@
 static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
   printk(KERN_DEBUG "Probe function get called\n");
+  // print pci revision
+  printk(KERN_INFO "The device revision is %u\n", dev->revision);
   // enable the PCI device
   if (pci_enable_device(dev))
     return -ENODEV;
