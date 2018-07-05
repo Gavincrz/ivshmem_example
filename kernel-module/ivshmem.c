@@ -10,13 +10,17 @@
 
 static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
-  printk(KERN_INFO "Probe function get called\n");
+  printk(KERN_DEBUG "Probe function get called\n");
+  // enable the PCI device
+  if (pci_enable_device(dev))
+    return -ENODEV;
+  printk(KERN_DEBUG "Successfully enable the device\n");
   return 0;
 }
 
 static void ivshmem_remove(struct pci_dev *dev)
 {
-  printk(KERN_INFO "Remove function get called\n");
+  printk(KERN_DEBUG "Remove function get called\n");
   return;
 }
 
@@ -40,7 +44,7 @@ static int __init ivshmem_init_module(void)
   ret = pci_register_driver(&ivshmem_pci_driver);
   if (ret == 0)
   {
-    printk(KERN_INFO "Module loaded\n");
+    printk(KERN_DEBUG "Module loaded\n");
   }
   else
   {
@@ -52,7 +56,7 @@ static int __init ivshmem_init_module(void)
 static void __exit ivshmem_exit_module(void)
 {
   pci_unregister_driver(&ivshmem_pci_driver);
-  printk(KERN_INFO "Module exit");
+  printk(KERN_DEBUG "Module exit");
 }
 
 MODULE_DEVICE_TABLE(pci, ivshmem_pci_ids);
