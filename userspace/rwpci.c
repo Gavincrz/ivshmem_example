@@ -7,16 +7,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "common.h"
 
-#define MAP_SIZE 4096UL
+
 #define BYTE_TO_PRINT 32
 #define BYTE_PER_LINE 8
 
-void print_error() {
-  fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
-  __LINE__, __FILE__, errno, strerror(errno));
-   exit(1);
-}
 
 void print_bytes(char *base_addr) {
   for (int i = 0; i < BYTE_TO_PRINT; i++){
