@@ -10,7 +10,9 @@
 
 static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
-  int ret = 0;
+
+  unsigned int bar_addr;
+  int nvec;
   printk(KERN_DEBUG "Probe function get called\n");
 
   // print some info for experiments
@@ -18,7 +20,9 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
   // using qemu version lower than 2.6 will read 0, otherwise 1
   printk(KERN_INFO "The device revision is %u\n", dev->revision);
 
+  /*
   // print BAR0,1,2 addresses
+  int ret = 0;
   unsigned int bar0, bar1, bar2;
   if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_0, &bar0))
     return ret;
@@ -29,16 +33,46 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
   if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_2, &bar2))
     return ret;
   printk(KERN_INFO "BAR2: %08x", bar2);
+  */
 
   // enable the PCI device
   if (pci_enable_device(dev))
     return -ENODEV;
   printk(KERN_DEBUG "Successfully enable the device\n");
-  return ret;
+
+  // request the region
+  if (pci_request_regions(dev, DRIVER_NAME))
+    goto out_disable;
+  printk(KERN_DEBUG "Successfully reserve the resource\n");
+
+  // access BAR address using pci_resource_start
+
+  bar_addr = pci_resource_start(dev, 0);
+  printk(KERN_INFO "BAR0: 0x%08x", bar_addr);
+  bar_addr = pci_resource_start(dev, 2);
+  printk(KERN_INFO "BAR2: 0x%08x", bar_addr);
+
+  // play with MSI
+  // allocate 1 interrupt vector
+  nvec = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_MSI | PCI_IRQ_MSIX);
+  if (nvec < 0)
+    goto out_release;
+  printk(KERN_DEBUG "Successfully allocate %d irq vectors", nvec);
+  return 0;
+
+
+out_release:
+  pci_release_regions(dev);
+out_disable:
+  pci_disable_device(dev);
+  return -ENODEV;
+
 }
 
 static void ivshmem_remove(struct pci_dev *dev)
 {
+  pci_release_regions(dev);
+  pci_disable_device(dev);
   printk(KERN_DEBUG "Remove function get called\n");
   return;
 }

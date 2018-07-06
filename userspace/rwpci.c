@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <stdint.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -46,7 +45,7 @@ int main(int argc, char **argv) {
   if(map_base == (void *) -1) print_error();
 
   printf("Memory mapped to address 0x%08lx.\n", (unsigned long) map_base);
-  printf("Current first ten byte: \n");
+  printf("Current content in hex: \n");
 
   print_bytes(map_base);
 
