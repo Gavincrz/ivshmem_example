@@ -56,6 +56,7 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
   // allocate 1 interrupt vector
   nvec = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_MSI | PCI_IRQ_MSIX);
   if (nvec < 0)
+    printk(KERN_ERR "Fail to allocate irq vectors %d", nvec);
     goto out_release;
   printk(KERN_DEBUG "Successfully allocate %d irq vectors", nvec);
   return 0;
