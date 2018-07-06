@@ -12,7 +12,7 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 
   unsigned int bar_addr;
-  int nvec;
+  int nvec, event_irq;
   printk(KERN_DEBUG "Probe function get called\n");
 
   // print some info for experiments
@@ -54,15 +54,21 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 
   // play with MSI
   // allocate 1 interrupt vector
-  nvec = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_MSI | PCI_IRQ_MSIX);
+  nvec = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_MSIX);
   if (nvec < 0){
     printk(KERN_ERR "Fail to allocate irq vectors %d", nvec);
     goto out_release;
   }
   printk(KERN_DEBUG "Successfully allocate %d irq vectors", nvec);
+
+  // get the irq number with the first vector (vector number = 0)
+  event_irq = pci_irq_vector(dev, 0);
+  printk(KERN_DEBUG "The irq number is %d", event_irq);
+
   return 0;
 
-
+// out_free_vec:
+//   pci_free_irq_vectors(dev);
 out_release:
   pci_release_regions(dev);
 out_disable:
@@ -73,9 +79,10 @@ out_disable:
 
 static void ivshmem_remove(struct pci_dev *dev)
 {
+  pci_free_irq_vectors(dev);
   pci_release_regions(dev);
   pci_disable_device(dev);
-  printk(KERN_DEBUG "Remove function get called\n");
+  printk(KERN_DEBUG "Remove function get called, resource freed\n");
   return;
 }
 
