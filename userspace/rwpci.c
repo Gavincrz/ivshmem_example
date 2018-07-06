@@ -20,7 +20,7 @@ void print_error() {
 
 void print_bytes(char *base_addr) {
   for (int i = 0; i < BYTE_TO_PRINT; i++){
-    printf("0x%02x ", base_addr[i]);
+    printf("0x%02hhx ", base_addr[i]);
     if ((i+1) % BYTE_PER_LINE == 0) {
       printf("\n");
     }
