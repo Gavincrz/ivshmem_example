@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS = -lrt
 
-readpci: readpci.c
-	$(CC) -o readpci readpci.c $(CFLAGS)
+readpci: rwpci.c
+	$(CC) -o rwpci rwpci.c $(CFLAGS)
 clean:
-	rm -f readpci
+	rm -f rwpci

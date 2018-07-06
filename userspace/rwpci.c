@@ -10,12 +10,22 @@
 #include <fcntl.h>
 
 #define MAP_SIZE 4096UL
-
+#define BYTE_TO_PRINT 32
+#define BYTE_PER_LINE 8
 
 void print_error() {
   fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
   __LINE__, __FILE__, errno, strerror(errno));
    exit(1);
+}
+
+void print_bytes(char *base_addr) {
+  for (int i = 0; i < BYTE_TO_PRINT; i++){
+    printf("0x%02x ", base_addr[i]);
+    if ((i+1) % BYTE_PER_LINE == 0) {
+      printf("\n");
+    }
+  }
 }
 
 int main(int argc, char **argv) {
@@ -35,11 +45,27 @@ int main(int argc, char **argv) {
   map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if(map_base == (void *) -1) print_error();
 
-  printf("PCI Memory mapped to address 0x%08lx.\n", (unsigned long) map_base);
+  printf("Memory mapped to address 0x%08lx.\n", (unsigned long) map_base);
+  printf("Current first ten byte: \n");
 
-  for (int i = 0; i < 10; i++){
-    printf("0x%02x ", map_base[i]);
+  print_bytes(map_base);
+
+  if (argc == 3) {
+    printf("\nwrite %s to dev, only write 32 bytes for testing", argv[2]);
+    int i = 0;
+    for (i; argv[2][i] != '\0' && i < BYTE_TO_PRINT; i++) {
+      map_base[i] = argv[2][i];
+    }
+
+    // overwrite left bytes
+    for (i; i < BYTE_TO_PRINT; i++) {
+      map_base[i] = 0x00;
+    }
+    printf("After writing: \n");
+    print_bytes(map_base);
   }
+
+
 
   close(fd);
   return 0;
