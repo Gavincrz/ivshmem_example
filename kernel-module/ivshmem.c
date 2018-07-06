@@ -2,17 +2,26 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/pci.h>
+#include <linux/interrupt.h>
 
 #define DRIVER_NAME "ivshmem"
 #define IVSHMEM_VENDOR_ID 0x1AF4
 #define IVSHMEM_DEVICE_ID 0x1110
 
+static int event_irq = -1;
+
+irqreturn_t irq_handler(int irq, void *dev_id)
+{
+  printk(KERN_INFO "irq_handler get called!");
+  return IRQ_HANDLED;
+}
 
 static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 
   unsigned int bar_addr;
-  int nvec, event_irq;
+  int nvec;
+  int ret;
   printk(KERN_DEBUG "Probe function get called\n");
 
   // print some info for experiments
@@ -65,10 +74,17 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
   event_irq = pci_irq_vector(dev, 0);
   printk(KERN_DEBUG "The irq number is %d", event_irq);
 
+  ret = request_irq(event_irq, irq_handler, IRQF_SHARED, DRIVER_NAME, dev);
+  if (ret) {
+    printk(KERN_ERR "Fail to request shared irq, error: %d", ret);
+    goto out_free_vec;
+  }
+  printk(KERN_DEBUG "Successfully request irq with number %d", event_irq);
+
   return 0;
 
-// out_free_vec:
-//   pci_free_irq_vectors(dev);
+out_free_vec:
+  pci_free_irq_vectors(dev);
 out_release:
   pci_release_regions(dev);
 out_disable:
@@ -79,6 +95,8 @@ out_disable:
 
 static void ivshmem_remove(struct pci_dev *dev)
 {
+  if (event_irq != -1)
+    free_irq(event_irq, dev);
   pci_free_irq_vectors(dev);
   pci_release_regions(dev);
   pci_disable_device(dev);
