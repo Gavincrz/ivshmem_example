@@ -189,17 +189,17 @@ static int ivshmem_close(struct inode *i, struct file *f)
 
 static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
   // print ivposition and status
-  uint32_t vmid, status, msg;
+  uint32_t vmid, msg;
   vmid = readl(regs + IVPosition);
-	printk("IVSHMEM: IVPosition is 0x%d\n", vmid);
-  status = readl(regs + IntrStatus);
-  printk("IVSHMEM: IntrStatus is 0x%x\n", status);
+	printk("IVSHMEM: IVPosition is %d\n", vmid);
   msg = readl(base_addr);
   printk("IVSHMEM: read shared mem 0x%x\n", msg);
 
   switch (cmd){
     case CMD_READ_SHMEM:
       printk(KERN_INFO "IOCTL: read shared mem");
+      if (copy_to_user((int *)arg, &msg, sizeof(int)))
+        return -EACCES;
       break;
     case CMD_READ_VMID:
       printk(KERN_INFO "IOCTL: read vmid");
