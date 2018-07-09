@@ -13,9 +13,9 @@
 #define IVSHMEM_DEVICE_ID 0x1110
 #define VECTOR_ID 0
 
-#define CMD_READ_SHMEM 0
-#define CMD_READ_VMID 1
-#define CMD_INTERRUPT 2
+#define CMD_READ_SHMEM _IOR('i', 1, int)
+#define CMD_READ_VMID _IOR('i', 2, int)
+#define CMD_INTERRUPT _IOW('i', 3, int)
 
 
 enum {
@@ -235,6 +235,8 @@ static struct file_operations ivshmem_fops =
 static int __init ivshmem_init_module(void)
 {
 	int ret;
+  // print something to understand
+  printk(KERN_INFO "command %ld, %ld, %ld",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
 
   ret = register_chrdev(0, DRIVER_NAME, &ivshmem_fops);
 	if (ret < 0) {

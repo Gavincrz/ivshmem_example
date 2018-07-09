@@ -6,9 +6,9 @@
 #include <sys/ioctl.h>
 #include <stdlib.h>
 
-#define CMD_READ_SHMEM 0
-#define CMD_READ_VMID 1
-#define CMD_INTERRUPT 2
+#define CMD_READ_SHMEM _IOR('i', 1, int)
+#define CMD_READ_VMID _IOR('i', 2, int)
+#define CMD_INTERRUPT _IOW('i', 3, int)
 
 void get_sharemem(int fd){
   int value;
@@ -48,6 +48,10 @@ void send_interrupt(int fd, int dest_vm){
 
 int main(int argc, char *argv[])
 {
+
+  // print something to understand
+  printf("command %ld, %ld, %ld",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
+
   char *file_name = "/dev/ivshmem";
   int fd;
 
