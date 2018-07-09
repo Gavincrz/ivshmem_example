@@ -35,7 +35,8 @@ void get_vmid(int fd){
 }
 
 void send_interrupt(int fd, int dest_vm){
-  if (ioctl(fd, CMD_INTERRUPT, &dest_vm) == -1)
+  int dest = dest_vm;
+  if (ioctl(fd, CMD_INTERRUPT, &dest) != 0)
   {
     perror("failed to write to doorbell\n");
   }
