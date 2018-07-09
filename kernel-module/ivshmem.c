@@ -173,18 +173,14 @@ static int __init ivshmem_init_module(void)
   major_nr = ret;
   printk("IVSHMEM: Major device number is: %d\n", major_nr);
 
-  pci_unregister_driver(&ivshmem_pci_driver);
   ret = pci_register_driver(&ivshmem_pci_driver);
-  if (ret == 0)
-  {
-    printk(KERN_DEBUG "Module loaded\n");
-  }
-  else
-  {
-    printk(KERN_ERR "Module failed to loaded\n");
-    return ret;
+  if (ret < 0) {
+		goto error;
   }
 	return 0;
+error:
+  	unregister_chrdev(major_nr, DRIVER_NAME);
+  return ret;
 }
 
 static void __exit ivshmem_exit_module(void)
