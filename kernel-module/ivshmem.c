@@ -173,6 +173,7 @@ static int __init ivshmem_init_module(void)
   major_nr = ret;
   printk("IVSHMEM: Major device number is: %d\n", major_nr);
 
+  pci_unregister_driver(&ivshmem_pci_driver);
   ret = pci_register_driver(&ivshmem_pci_driver);
   if (ret == 0)
   {
