@@ -208,6 +208,7 @@ static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
       printk(KERN_INFO "IVSHMEM: read vmid");
       if (copy_to_user((int *)arg, &vmid, sizeof(int)))
         return -EACCES;
+      break;
     case CMD_INTERRUPT:
       msg = ((arg & 0xffff) << 16) + (VECTOR_ID & 0xffff);
       printk(KERN_INFO "IVSHMEM: write 0x%x to Doorbell", msg);
