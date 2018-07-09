@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 {
 
   // print something to understand
-  printf("command %ld, %ld, %ld",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
+  printf("command %ld, %ld, %ld\n",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
 
   char *file_name = "/dev/ivshmem";
   int fd;

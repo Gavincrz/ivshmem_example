@@ -11,7 +11,8 @@
 
 #define IVSHMEM_VENDOR_ID 0x1AF4
 #define IVSHMEM_DEVICE_ID 0x1110
-#define VECTOR_ID 0
+#define VECTOR_ID 1 //used for trigger interrupt
+#define NUM_VECTOR 2
 
 #define CMD_READ_SHMEM _IOR('i', 1, int)
 #define CMD_READ_VMID _IOR('i', 2, int)
@@ -35,6 +36,9 @@ void __iomem * regs;
 void * base_addr;
 unsigned int ioaddr_size;
 
+static int vectors[NUM_VECTOR];
+static int irqs[NUM_VECTOR];
+
 irqreturn_t irq_handler(int irq, void *dev_id)
 {
   printk(KERN_INFO "SHUANGDAO: irq_handler get called!, irq_number: %d", irq);
@@ -44,7 +48,7 @@ irqreturn_t irq_handler(int irq, void *dev_id)
 static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
   int nvec;
-  int ret;
+  int ret, i;
   printk(KERN_DEBUG "Probe function get called\n");
 
   // print some info for experiments
@@ -92,23 +96,28 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
   writel(0xffffffff, regs + IntrMask);
 
   // play with MSI
-  // allocate 1 interrupt vector
-  nvec = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_MSIX);
+  // allocate 2 interrupt vector
+  nvec = pci_alloc_irq_vectors(dev, NUM_VECTOR, NUM_VECTOR, PCI_IRQ_MSIX);
   if (nvec < 0){
     printk(KERN_ERR "Fail to allocate irq vectors %d", nvec);
     goto out_release;
   }
+
   printk(KERN_DEBUG "Successfully allocate %d irq vectors", nvec);
 
-  // get the irq number with the first vector (vector number = 0)
-  event_irq = pci_irq_vector(dev, VECTOR_ID);
-  printk(KERN_DEBUG "The irq number is %d", event_irq);
+  // get the irq numbers for each requet
+  for (i = 0; i < NUM_VECTOR; i++){
+    vectors[i] = i;
+    irqs[i] = pci_irq_vector(dev, i);
+    printk(KERN_DEBUG "The irq number is %d for vector %d", irqs[i], i);
 
-  ret = request_irq(event_irq, irq_handler, IRQF_SHARED, DRIVER_NAME, dev);
-  if (ret) {
-    printk(KERN_ERR "Fail to request shared irq, error: %d", ret);
-    goto out_free_vec;
+    ret = request_irq(irqs[i], irq_handler, IRQF_SHARED, DRIVER_NAME, dev);
+    if (ret) {
+      printk(KERN_ERR "Fail to request shared irq %d, error: %d", irqs[i], ret);
+      goto out_free_vec;
+    }
   }
+
   printk(KERN_DEBUG "Successfully request irq with number %d", event_irq);
 
   return 0;
@@ -125,11 +134,14 @@ out_disable:
 
 static void ivshmem_remove(struct pci_dev *dev)
 {
+  int i;
   pci_iounmap(dev, regs);
   pci_iounmap(dev, base_addr);
 
-  if (event_irq != -1)
-    free_irq(event_irq, dev);
+  for (i = 0; i < NUM_VECTOR; i++){
+    free_irq(irqs[i], dev);
+  }
+
   pci_free_irq_vectors(dev);
   pci_release_regions(dev);
   pci_disable_device(dev);
@@ -236,7 +248,7 @@ static int __init ivshmem_init_module(void)
 {
 	int ret;
   // print something to understand
-  printk(KERN_INFO "command %ld, %ld, %ld",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
+  printk(KERN_INFO "command %ld, %ld, %ld\n",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
 
   ret = register_chrdev(0, DRIVER_NAME, &ivshmem_fops);
 	if (ret < 0) {
