@@ -193,7 +193,7 @@ static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
   switch (cmd){
     case CMD_READ_SHMEM:
       msg = readl(base_addr);
-      printk(KERN_INFO "IOCTL: read shared mem %d\n", msg);
+      printk(KERN_INFO "IOCTL: read shared mem 0x%x\n", msg);
       break;
     case CMD_FAKE1:
       printk(KERN_INFO "IOCTL: fake command");
