@@ -5,7 +5,7 @@
 #include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 #define DRIVER_NAME "ivshmem"
 #define CDEV_NAME "ivshmem_cdev"
@@ -14,10 +14,22 @@
 #define CMD_READ_SHMEM 0
 #define CMD_FAKE1 1
 
+enum {
+	/* KVM Inter-VM shared memory device register offsets */
+	IntrMask        = 0x00,    /* Interrupt Mask */
+	IntrStatus      = 0x04,    /* Interrupt Status */
+	IVPosition      = 0x08,    /* VM ID */
+	Doorbell        = 0x0c,    /* Doorbell */
+};
+
 
 static int event_irq = -1;
 static int major_nr;
-
+unsigned int bar0_addr;
+unsigned int bar2_addr;
+void __iomem * regs;
+void * base_addr;
+unsigned int ioaddr_size;
 
 irqreturn_t irq_handler(int irq, void *dev_id)
 {
@@ -27,8 +39,6 @@ irqreturn_t irq_handler(int irq, void *dev_id)
 
 static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
-
-  unsigned int bar_addr;
   int nvec;
   int ret;
   printk(KERN_DEBUG "Probe function get called\n");
@@ -65,10 +75,17 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
 
   // access BAR address using pci_resource_start
 
-  bar_addr = pci_resource_start(dev, 0);
-  printk(KERN_INFO "BAR0: 0x%08x", bar_addr);
-  bar_addr = pci_resource_start(dev, 2);
-  printk(KERN_INFO "BAR2: 0x%08x", bar_addr);
+  bar0_addr = pci_resource_start(dev, 0);
+  printk(KERN_INFO "BAR0: 0x%08x", bar0_addr);
+  regs = pci_iomap(dev, 0, 0x100);
+
+  bar2_addr = pci_resource_start(dev, 2);
+  ioaddr_size = pci_resource_len(dev, 2);
+  printk(KERN_INFO "BAR2: 0x%08x", bar2_addr);
+  base_addr = pci_iomap(dev, 2, 0);
+
+  /* set all masks to on */
+  writel(0xffffffff, regs + IntrMask);
 
   // play with MSI
   // allocate 1 interrupt vector
@@ -104,6 +121,9 @@ out_disable:
 
 static void ivshmem_remove(struct pci_dev *dev)
 {
+  pci_iounmap(dev, regs);
+  pci_iounmap(dev, base_addr);
+
   if (event_irq != -1)
     free_irq(event_irq, dev);
   pci_free_irq_vectors(dev);
@@ -126,7 +146,33 @@ static void ivshmem_remove(struct pci_dev *dev)
     .remove = ivshmem_remove,
 };
 
+static ssize_t ivshmem_read(struct file * filp, char * buffer, size_t len,
+  loff_t * poffset)
+  {
+    int bytes_read = 0;
+    unsigned long offset;
 
+    offset = *poffset;
+
+    if (base_addr) {
+      printk(KERN_ERR "KVM_IVSHMEM: cannot read from ioaddr (NULL)\n");
+      return 0;
+    }
+
+    if (len > ioaddr_size - offset) {
+      len = ioaddr_size - offset;
+    }
+
+    if (len == 0) return 0;
+
+    bytes_read = copy_to_user(buffer, base_addr + offset, len);
+    if (bytes_read > 0) {
+      return -EFAULT;
+    }
+
+    *poffset += len;
+    return len;
+  }
 
 
 static int fake_open(struct inode *i, struct file *f)
@@ -141,6 +187,9 @@ static int fake_close(struct inode *i, struct file *f)
 }
 
 static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
+  uint32_t msg = readl(regs + IVPosition);
+	printk("KVM_IVSHMEM: my posn is %d\n", msg);
+
   switch (cmd){
     case CMD_READ_SHMEM:
       printk(KERN_INFO "IOCTL: read shared mem");
@@ -158,6 +207,7 @@ static struct file_operations ivshmem_fops =
     .owner = THIS_MODULE,
     .open = fake_open,
     .release = fake_close,
+    .read = ivshmem_read,
     .unlocked_ioctl = ivshmem_ioctl
 };
 

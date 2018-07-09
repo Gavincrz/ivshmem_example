@@ -9,8 +9,8 @@
 #define CMD_FAKE1 1
 
 void get_sharemem(int fd){
-  int tmp;
-  if (ioctl(fd, CMD_READ_SHMEM, &tmp) == -1)
+  char *value;
+  if (ioctl(fd, CMD_READ_SHMEM, value) == -1)
   {
     perror("failed to get sharemem");
   }
