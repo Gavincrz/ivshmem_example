@@ -35,7 +35,7 @@ void get_vmid(int fd){
 }
 
 void send_interrupt(int fd, int dest_vm){
-  if (ioctl(fd, CMD_INTERRUPT, dest_vm) == -1)
+  if (ioctl(fd, CMD_INTERRUPT, &dest_vm) == -1)
   {
     perror("failed to write to doorbell\n");
   }
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
       printf("Usage: \n");
       printf("sudo ./userctl -m                // get shmem content\n");
       printf("sudo ./userctl -d                // get self vm id\n");
-      printf("sudo ./userctl -i <dest_vm>    // trigger interrupt to dest_vm\n");
+      printf("sudo ./userctl -i <dest_vm>      // trigger interrupt to dest_vm\n");
     }
   }
 
