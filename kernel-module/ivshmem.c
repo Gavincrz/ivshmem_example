@@ -13,14 +13,10 @@
 #define IVSHMEM_DEVICE_ID 0x1110
 #define CMD_READ_SHMEM 0
 #define CMD_FAKE1 1
-#define FIRST_MINOR 0
-#define MINOR_CNT 1
 
 
 static int event_irq = -1;
-static dev_t stored_dev;
-static struct cdev c_dev;
-static struct class *cl;
+static int major_nr;
 
 
 irqreturn_t irq_handler(int irq, void *dev_id)
@@ -168,6 +164,15 @@ static struct file_operations ivshmem_fops =
 static int __init ivshmem_init_module(void)
 {
 	int ret;
+
+  ret = register_chrdev(0, DRIVER_NAME, &ivshmem_fops);
+	if (ret < 0) {
+		printk(KERN_ERR "Unable to register ivshmem device\n");
+		return ret;
+  }
+  major_nr = ret;
+  printk("IVSHMEM: Major device number is: %d\n", major_nr);
+
   ret = pci_register_driver(&ivshmem_pci_driver);
   if (ret == 0)
   {
@@ -178,51 +183,13 @@ static int __init ivshmem_init_module(void)
     printk(KERN_ERR "Module failed to loaded\n");
     return ret;
   }
-
-  // register and create chardev
-  if ((ret = alloc_chrdev_region(&stored_dev, FIRST_MINOR, MINOR_CNT, CDEV_NAME)) < 0)
-  {
-    return ret;
-  }
-
-  printk(KERN_INFO "Allocate chrdev region!\n");
-  cdev_init(&c_dev, &ivshmem_fops);
-
-  if ((ret = cdev_add(&c_dev, stored_dev, MINOR_CNT)) < 0)
-  {
-    return ret;
-  }
-  printk(KERN_INFO "Add chrdev!\n");
-
-  if ((cl = class_create(THIS_MODULE, "char")))
-  {
-    cdev_del(&c_dev);
-    unregister_chrdev_region(stored_dev, MINOR_CNT);
-    return -ENODEV;
-  }
-  printk(KERN_INFO "class created!\n");
-
-
-  if (device_create(cl, NULL, stored_dev, NULL, CDEV_NAME))
-  {
-    class_destroy(cl);
-    cdev_del(&c_dev);
-    unregister_chrdev_region(stored_dev, MINOR_CNT);
-    return -ENODEV;
-  }
-  printk(KERN_INFO "char device created!\n");
-
 	return 0;
 }
 
 static void __exit ivshmem_exit_module(void)
 {
-  device_destroy(cl, stored_dev);
-  class_destroy(cl);
-  cdev_del(&c_dev);
-  unregister_chrdev_region(stored_dev, MINOR_CNT);
-
   pci_unregister_driver(&ivshmem_pci_driver);
+  unregister_chrdev(major_nr, DRIVER_NAME);
   printk(KERN_DEBUG "Module exit");
 }
 
