@@ -9,14 +9,14 @@
 #define CMD_READ_VMID 1
 
 void get_sharemem(int fd){
-  char *value;
-  if (ioctl(fd, CMD_READ_SHMEM, value) == -1)
+  int value;
+  if (ioctl(fd, CMD_READ_SHMEM, &value) == -1)
   {
     perror("failed to get sharemem \n");
   }
   else
   {
-    printf("Status : Successfully get sharemem, %s\n", value);
+    printf("Status : Successfully get sharemem, %s\n", (char *)&value);
   }
 }
 
