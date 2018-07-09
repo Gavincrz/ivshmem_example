@@ -8,12 +8,15 @@
 #include <linux/uaccess.h>
 
 #define DRIVER_NAME "ivshmem"
-#define CDEV_NAME "ivshmem_cdev"
+
 #define IVSHMEM_VENDOR_ID 0x1AF4
 #define IVSHMEM_DEVICE_ID 0x1110
+#define VECTOR_ID 0
 
 #define CMD_READ_SHMEM 0
 #define CMD_READ_VMID 1
+#define CMD_INTERRUPT 2
+
 
 enum {
 	/* KVM Inter-VM shared memory device register offsets */
@@ -34,7 +37,7 @@ unsigned int ioaddr_size;
 
 irqreturn_t irq_handler(int irq, void *dev_id)
 {
-  printk(KERN_INFO "irq_handler get called!, irq_number: %d", irq);
+  printk(KERN_INFO "SHUANGDAO: irq_handler get called!, irq_number: %d", irq);
   return IRQ_HANDLED;
 }
 
@@ -98,7 +101,7 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
   printk(KERN_DEBUG "Successfully allocate %d irq vectors", nvec);
 
   // get the irq number with the first vector (vector number = 0)
-  event_irq = pci_irq_vector(dev, 0);
+  event_irq = pci_irq_vector(dev, VECTOR_ID);
   printk(KERN_DEBUG "The irq number is %d", event_irq);
 
   ret = request_irq(event_irq, irq_handler, IRQF_SHARED, DRIVER_NAME, dev);
@@ -197,14 +200,18 @@ static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
 
   switch (cmd){
     case CMD_READ_SHMEM:
-      printk(KERN_INFO "IOCTL: read shared mem");
+      printk(KERN_INFO "IVSHMEM: read shared mem");
       if (copy_to_user((int *)arg, &msg, sizeof(int)))
         return -EACCES;
       break;
     case CMD_READ_VMID:
-      printk(KERN_INFO "IOCTL: read vmid");
+      printk(KERN_INFO "IVSHMEM: read vmid");
       if (copy_to_user((int *)arg, &vmid, sizeof(int)))
         return -EACCES;
+    case CMD_INTERRUPT:
+      msg = ((arg & 0xffff) << 16) + (VECTOR_ID & 0xffff);
+      printk(KERN_INFO "IVSHMEM: write 0x%x to Doorbell", msg);
+      writel(msg, regs + Doorbell);
       break;
   }
   return 0;
