@@ -11,8 +11,9 @@
 #define CDEV_NAME "ivshmem_cdev"
 #define IVSHMEM_VENDOR_ID 0x1AF4
 #define IVSHMEM_DEVICE_ID 0x1110
+
 #define CMD_READ_SHMEM 0
-#define CMD_FAKE1 1
+#define CMD_READ_VMID 1
 
 enum {
 	/* KVM Inter-VM shared memory device register offsets */
@@ -175,30 +176,36 @@ static ssize_t ivshmem_read(struct file * filp, char * buffer, size_t len,
   }
 
 
-static int fake_open(struct inode *i, struct file *f)
+static int ivshmem_open(struct inode *i, struct file *f)
 {
   printk(KERN_INFO "chardev file opened!");
   return 0;
 }
-static int fake_close(struct inode *i, struct file *f)
+static int ivshmem_close(struct inode *i, struct file *f)
 {
   printk(KERN_INFO "chardev file closed!");
   return 0;
 }
 
 static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
-  uint32_t msg = readl(regs + IVPosition);
-	printk("KVM_IVSHMEM: my posn is %d\n", msg);
+  // print ivposition and status
+  uint32_t vmid, status, msg;
+  vmid = readl(regs + IVPosition);
+	printk("IVSHMEM: IVPosition is 0x%d\n", vmid);
+  status = readl(regs + IntrStatus);
+  printk("IVSHMEM: IntrStatus is 0x%x\n", status);
+  msg = readl(base_addr);
+  printk("IVSHMEM: read shared mem 0x%x\n", msg);
 
   switch (cmd){
     case CMD_READ_SHMEM:
-      msg = readl(base_addr);
-      printk(KERN_INFO "IOCTL: read shared mem 0x%x\n", msg);
+      printk(KERN_INFO "IOCTL: read shared mem");
       break;
-    case CMD_FAKE1:
-      printk(KERN_INFO "IOCTL: fake command");
+    case CMD_READ_VMID:
+      printk(KERN_INFO "IOCTL: read vmid");
+      if (copy_to_user((int *)arg, &vmid, sizeof(int)))
+        return -EACCES;
       break;
-
   }
   return 0;
 }
@@ -206,8 +213,8 @@ static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
 static struct file_operations ivshmem_fops =
 {
     .owner = THIS_MODULE,
-    .open = fake_open,
-    .release = fake_close,
+    .open = ivshmem_open,
+    .release = ivshmem_close,
     .read = ivshmem_read,
     .unlocked_ioctl = ivshmem_ioctl
 };
