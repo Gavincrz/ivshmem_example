@@ -3,16 +3,29 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
+#include <linux/fs.h>
+#include <linux/cdev.h>
+#include <asm/uaccess.h>
 
 #define DRIVER_NAME "ivshmem"
+#define CDEV_NAME "ivshmem_cdev"
 #define IVSHMEM_VENDOR_ID 0x1AF4
 #define IVSHMEM_DEVICE_ID 0x1110
+#define CMD_READ_SHMEM 0
+#define CMD_FAKE1 1
+#define FIRST_MINOR 0
+#define MINOR_CNT 1
+
 
 static int event_irq = -1;
+static dev_t stored_dev;
+static struct cdev c_dev;
+static struct class *cl;
+
 
 irqreturn_t irq_handler(int irq, void *dev_id)
 {
-  printk(KERN_INFO "irq_handler get called!");
+  printk(KERN_INFO "irq_handler get called!, irq_number: %d", irq);
   return IRQ_HANDLED;
 }
 
@@ -118,6 +131,40 @@ static void ivshmem_remove(struct pci_dev *dev)
 };
 
 
+
+
+static int fake_open(struct inode *i, struct file *f)
+{
+  printk(KERN_INFO "chardev file opened!");
+  return 0;
+}
+static int fake_close(struct inode *i, struct file *f)
+{
+  printk(KERN_INFO "chardev file closed!");
+  return 0;
+}
+
+static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
+  switch (cmd){
+    case CMD_READ_SHMEM:
+      printk(KERN_INFO "IOCTL: read shared mem");
+      break;
+    case CMD_FAKE1:
+      printk(KERN_INFO "IOCTL: fake command");
+      break;
+
+  }
+  return 0;
+}
+
+static struct file_operations ivshmem_fops =
+{
+    .owner = THIS_MODULE,
+    .open = fake_open,
+    .release = fake_close,
+    .unlocked_ioctl = ivshmem_ioctl
+};
+
 static int __init ivshmem_init_module(void)
 {
 	int ret;
@@ -129,12 +176,52 @@ static int __init ivshmem_init_module(void)
   else
   {
     printk(KERN_ERR "Module failed to loaded\n");
+    return ret;
   }
-	return ret;
+
+  // register and create chardev
+  if ((ret = alloc_chrdev_region(&stored_dev, FIRST_MINOR, MINOR_CNT, CDEV_NAME)) < 0)
+  {
+    return ret;
+  }
+
+  printk(KERN_INFO "Allocate chrdev region!\n");
+  cdev_init(&c_dev, &ivshmem_fops);
+
+  if ((ret = cdev_add(&c_dev, stored_dev, MINOR_CNT)) < 0)
+  {
+    return ret;
+  }
+  printk(KERN_INFO "Add chrdev!\n");
+
+  if ((cl = class_create(THIS_MODULE, "char")))
+  {
+    cdev_del(&c_dev);
+    unregister_chrdev_region(stored_dev, MINOR_CNT);
+    return -ENODEV;
+  }
+  printk(KERN_INFO "class created!\n");
+
+
+  if (device_create(cl, NULL, stored_dev, NULL, CDEV_NAME))
+  {
+    class_destroy(cl);
+    cdev_del(&c_dev);
+    unregister_chrdev_region(stored_dev, MINOR_CNT);
+    return -ENODEV;
+  }
+  printk(KERN_INFO "char device created!\n");
+
+	return 0;
 }
 
 static void __exit ivshmem_exit_module(void)
 {
+  device_destroy(cl, stored_dev);
+  class_destroy(cl);
+  cdev_del(&c_dev);
+  unregister_chrdev_region(stored_dev, MINOR_CNT);
+
   pci_unregister_driver(&ivshmem_pci_driver);
   printk(KERN_DEBUG "Module exit");
 }
