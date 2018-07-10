@@ -64,7 +64,7 @@ void send_interrupt(int fd, int dest_vm, int msg){
 void wait_for_irq(int fd){
    struct pollfd fds[1];
    int ret = 0;
-   int dest_vm = -1;
+
    fds[0].fd = fd;
    fds[0].events = POLLIN;
    printf("Waiting for message from other vm .... \n");
@@ -72,14 +72,18 @@ void wait_for_irq(int fd){
       ret = poll(fds, 1, -1);
    }
    printf("Message is ready. \n");
-   dest_vm = get_sharemem(fd);
+}
 
-   if (dest_vm > -1){
-     printf("message received from vm_id: %d\n", dest_vm);
-     // reply
-     send_interrupt(fd, dest_vm, 6666);
-   }
+void wait_and_reply(int fd){
+  int dest_vm = -1;
+  wait_for_irq(fd);
+  dest_vm = get_sharemem(fd);
 
+  if (dest_vm > -1){
+    printf("message received from vm_id: %d\n", dest_vm);
+    // reply
+    send_interrupt(fd, dest_vm, 6666);
+  }
 }
 
 void send_and_wait(int fd, int dest_vm){
@@ -87,6 +91,7 @@ void send_and_wait(int fd, int dest_vm){
   int msg = get_vmid(fd);
   send_interrupt(fd, dest_vm, msg);
   wait_for_irq(fd);
+  get_sharemem(fd);
 }
 
 int main(int argc, char *argv[])
@@ -129,7 +134,7 @@ int main(int argc, char *argv[])
       printf("Usage: \n");
       printf("sudo ./userctl -m                     // get shmem content\n");
       printf("sudo ./userctl -d                     // get self vm id\n");
-      printf("sudo ./userctl -p                     // wait for interrupt\n");
+      printf("sudo ./userctl -p                     // wait for interrupt and reply\n");
       printf("sudo ./userctl -i <dest_vm> <msg>     // trigger interrupt to dest_vm\n");
       printf("sudo ./userctl -c <dest_vm>           // send selfid to dest_vm and wait for reply\n");
     }
@@ -154,7 +159,7 @@ int main(int argc, char *argv[])
       send_interrupt(fd, dest_vm, msg);
       break;
     case option_poll:
-      wait_for_irq(fd);
+      wait_and_reply(fd);
       break;
     case option_commu:
       send_and_wait(fd, dest_vm);
