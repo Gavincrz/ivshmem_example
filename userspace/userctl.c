@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
       send_interrupt(fd, dest_vm, msg);
       break;
     case option_poll:
-
+      wait_for_irq(fd);
       break;
     default:
       break;
