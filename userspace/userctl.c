@@ -123,7 +123,6 @@ int main(int argc, char *argv[])
     else if ((strcmp(argv[1], "-c") == 0) && (argc == 3)){
       option = option_commu;
       dest_vm = atoi(argv[2]);
-      msg = atoi(argv[3]);
       printf("destination vm id is %d \n", dest_vm);
     }
     else {
