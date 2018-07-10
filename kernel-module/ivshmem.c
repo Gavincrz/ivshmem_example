@@ -126,6 +126,11 @@ out_disable:
 
 unsigned int ivshmem_poll (struct file *file, struct poll_table_struct *wait){
   printk(KERN_INFO "Poll function get called, waiting for irq");
+  if (irq_flag == 1){
+    irq_flag = 0;
+    printk(KERN_INFO "Message is ready, no need to wait");
+    return POLLIN | POLLRDNORM;
+  }
   poll_wait(file, &fortune_wait, wait);
   if (irq_flag == 1){
     irq_flag = 0;

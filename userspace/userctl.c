@@ -9,12 +9,13 @@
 
 #include "../ivshmem_common.h"
 
-enum {
+typedef enum user_options {
   option_read_shmem,
   option_read_vmid,
   option_send_irq,
-  option_poll
-};
+  option_poll,
+  option_commu
+} user_options;
 
 
 void get_sharemem(int fd){
@@ -25,7 +26,7 @@ void get_sharemem(int fd){
   }
   else
   {
-    printf("Status : Successfully get sharemem, %d\n", value);
+    printf("Received message from shared memory, %d\n", value);
   }
 }
 
@@ -34,13 +35,12 @@ void wait_for_irq(int fd){
    int ret = 0;
    fds[0].fd = fd;
    fds[0].events = POLLIN;
-   printf("Waiting for message from other vm ....");
+   printf("Waiting for message from other vm .... \n");
    while (!ret){
       ret = poll(fds, 1, -1);
    }
-   printf("Message is ready.");
+   printf("Message is ready. \n");
    get_sharemem(fd);
-
 }
 
 void get_vmid(int fd){
@@ -66,8 +66,13 @@ void send_interrupt(int fd, int dest_vm, int msg){
   }
   else
   {
-    printf("Shuang dao 1 \n");
+    printf("Interrupt sent to vm %d, msg: %d \n", dest_vm, msg);
   }
+}
+
+void send_and_wait(int fd, int dest_vm, int msg){
+  send_interrupt(fd, dest_vm, msg);
+  wait_for_irq(fd);
 }
 
 int main(int argc, char *argv[])
@@ -77,7 +82,8 @@ int main(int argc, char *argv[])
   printf("command %ld, %ld, %ld\n",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
 
   char *file_name = "/dev/ivshmem";
-  int fd, msg, option;
+  int fd, msg;
+  user_options option;
   int dest_vm = 0;
 
   // parsing arguments
@@ -100,11 +106,19 @@ int main(int argc, char *argv[])
       msg = atoi(argv[3]);
       printf("destination vm id is %d \n", dest_vm);
     }
+    else if ((strcmp(argv[1], "-c") == 0) && (argc == 4)){
+      option = option_commu;
+      dest_vm = atoi(argv[2]);
+      msg = atoi(argv[3]);
+      printf("destination vm id is %d \n", dest_vm);
+    }
     else {
       printf("Usage: \n");
       printf("sudo ./userctl -m                     // get shmem content\n");
       printf("sudo ./userctl -d                     // get self vm id\n");
+      printf("sudo ./userctl -p                     // wait for interrupt\n");
       printf("sudo ./userctl -i <dest_vm> <msg>     // trigger interrupt to dest_vm\n");
+      printf("sudo ./userctl -c <dest_vm> <msg>     // trigger interrupt to dest_vm and wait for reply\n");
     }
   }
 
@@ -128,6 +142,9 @@ int main(int argc, char *argv[])
       break;
     case option_poll:
       wait_for_irq(fd);
+      break;
+    case option_commu:
+      send_and_wait(fd, dest_vm, msg);
       break;
     default:
       break;
