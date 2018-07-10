@@ -6,7 +6,10 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/uaccess.h>
+#include <linux/wait.h>
+#include <linux/poll.h>
 #include "../ivshmem_common.h"
+
 #define DRIVER_NAME "ivshmem"
 
 #define IVSHMEM_VENDOR_ID 0x1AF4
@@ -26,18 +29,27 @@ enum {
 
 
 static int major_nr;
-unsigned int bar0_addr;
-unsigned int bar2_addr;
-void __iomem * regs;
-void * base_addr;
-unsigned int ioaddr_size;
+static unsigned int bar0_addr;
+static unsigned int bar2_addr;
+static void __iomem * regs;
+static void * base_addr;
+static unsigned int ioaddr_size;
 
 static int vectors[NUM_VECTOR];
 static int irqs[NUM_VECTOR];
+static int irq_flag = 0;
+
+static DECLARE_WAIT_QUEUE_HEAD(fortune_wait);
 
 irqreturn_t irq_handler(int irq, void *dev_id)
 {
-  printk(KERN_INFO "SHUANGDAO: irq_handler get called!, irq_number: %d", irq);
+  int msg;
+  msg = readl(base_addr);
+  printk(KERN_INFO "SHUANGDAO: irq_handler get called!, irq_number: %d \
+  msg received: 0x%x", irq, msg);
+  irq_flag = 1;
+  wake_up_interruptible(&fortune_wait);
+
   return IRQ_HANDLED;
 }
 
@@ -112,6 +124,18 @@ out_disable:
 
 }
 
+unsigned int ivshmem_poll (struct file *file, struct poll_table_struct *wait){
+  printk(KERN_INFO "Poll function get called, waiting for irq");
+  poll_wait(file, &fortune_wait, wait);
+  if (irq_flag == 1){
+    irq_flag = 0;
+    printk(KERN_INFO "Poll function returned");
+    return POLLIN | POLLRDNORM;
+  }
+  printk(KERN_INFO "Poll failed");
+  return 0;
+}
+
 static void ivshmem_remove(struct pci_dev *dev)
 {
   int i;
@@ -144,31 +168,9 @@ static void ivshmem_remove(struct pci_dev *dev)
 
 static ssize_t ivshmem_read(struct file * filp, char * buffer, size_t len,
   loff_t * poffset)
-  {
-    int bytes_read = 0;
-    unsigned long offset;
-
-    offset = *poffset;
-
-    if (base_addr) {
-      printk(KERN_ERR "KVM_IVSHMEM: cannot read from ioaddr (NULL)\n");
-      return 0;
-    }
-
-    if (len > ioaddr_size - offset) {
-      len = ioaddr_size - offset;
-    }
-
-    if (len == 0) return 0;
-
-    bytes_read = copy_to_user(buffer, base_addr + offset, len);
-    if (bytes_read > 0) {
-      return -EFAULT;
-    }
-
-    *poffset += len;
-    return len;
-  }
+{
+    return 0;
+}
 
 
 static int ivshmem_open(struct inode *i, struct file *f)
@@ -220,7 +222,8 @@ static struct file_operations ivshmem_fops =
     .open = ivshmem_open,
     .release = ivshmem_close,
     .read = ivshmem_read,
-    .unlocked_ioctl = ivshmem_ioctl
+    .unlocked_ioctl = ivshmem_ioctl,
+    .poll = ivshmem_poll
 };
 
 static int __init ivshmem_init_module(void)

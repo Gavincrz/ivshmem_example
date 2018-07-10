@@ -5,7 +5,16 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
+#include <poll.h>
+
 #include "../ivshmem_common.h"
+
+enum {
+  option_read_shmem,
+  option_read_vmid,
+  option_send_irq,
+  option_poll
+};
 
 
 void get_sharemem(int fd){
@@ -16,8 +25,22 @@ void get_sharemem(int fd){
   }
   else
   {
-    printf("Status : Successfully get sharemem, 0x%x\n", value);
+    printf("Status : Successfully get sharemem, %d\n", value);
   }
+}
+
+void wait_for_irq(int fd){
+   struct pollfd fds[1];
+   int ret = 0;
+   fds[0].fd = fd;
+   fds[0].events = POLLIN;
+   printf("Waiting for message from other vm ....");
+   while (!ret){
+      ret = poll(fds, 1, -1);
+   }
+   printf("Message is ready.");
+   get_sharemem(fd);
+
 }
 
 void get_vmid(int fd){
@@ -59,17 +82,20 @@ int main(int argc, char *argv[])
 
   // parsing arguments
   if (argc == 1){
-    option = CMD_READ_SHMEM;
+    option = option_read_shmem;
   }
   else{
     if (strcmp(argv[1], "-m") == 0){
-      option = CMD_READ_SHMEM;
+      option = option_read_shmem;
     }
     else if (strcmp(argv[1], "-d") == 0){
-      option = CMD_READ_VMID;
+      option = option_read_vmid;
+    }
+    else if (strcmp(argv[1], "-p") == 0){
+      option = option_poll;
     }
     else if ((strcmp(argv[1], "-i") == 0) && (argc == 4)){
-      option = CMD_INTERRUPT;
+      option = option_send_irq;
       dest_vm = atoi(argv[2]);
       msg = atoi(argv[3]);
       printf("destination vm id is %d \n", dest_vm);
@@ -91,18 +117,22 @@ int main(int argc, char *argv[])
 
   switch (option)
   {
-    case CMD_READ_SHMEM:
+    case option_read_shmem:
       get_sharemem(fd);
       break;
-    case CMD_READ_VMID:
+    case option_read_vmid:
       get_vmid(fd);
       break;
-    case CMD_INTERRUPT:
+    case option_send_irq:
       send_interrupt(fd, dest_vm, msg);
+      break;
+    case option_poll:
+
       break;
     default:
       break;
   }
+
   close(fd);
 
 }
