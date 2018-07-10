@@ -189,11 +189,13 @@ static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
 
   switch (cmd){
     case CMD_READ_SHMEM:
+      msg = readl(base_addr);
       printk(KERN_INFO "IVSHMEM: read shared mem");
       if (copy_to_user((int *)arg, &msg, sizeof(int)))
         return -EACCES;
       break;
     case CMD_READ_VMID:
+      vmid = readl(regs + IVPosition);
       printk(KERN_INFO "IVSHMEM: read vmid");
       if (copy_to_user((int *)arg, &vmid, sizeof(int)))
         return -EACCES;
