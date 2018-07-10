@@ -6,7 +6,7 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/uaccess.h>
-
+#include "../ivshmem_common.h"
 #define DRIVER_NAME "ivshmem"
 
 #define IVSHMEM_VENDOR_ID 0x1AF4
@@ -14,9 +14,6 @@
 #define VECTOR_ID 1 //used for trigger interrupt
 #define NUM_VECTOR 2
 
-#define CMD_READ_SHMEM _IOR('i', 1, int)
-#define CMD_READ_VMID _IOR('i', 2, int)
-#define CMD_INTERRUPT _IOW('i', 3, int)
 
 
 enum {
@@ -28,7 +25,6 @@ enum {
 };
 
 
-static int event_irq = -1;
 static int major_nr;
 unsigned int bar0_addr;
 unsigned int bar2_addr;
@@ -56,20 +52,6 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
   // using qemu version lower than 2.6 will read 0, otherwise 1
   printk(KERN_INFO "The device revision is %u\n", dev->revision);
 
-  /*
-  // print BAR0,1,2 addresses
-  int ret = 0;
-  unsigned int bar0, bar1, bar2;
-  if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_0, &bar0))
-    return ret;
-  printk(KERN_INFO "BAR0: %08x", bar0);
-  if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_1, &bar1))
-    return ret;
-  printk(KERN_INFO "BAR1: %08x", bar1);
-  if (ret = pci_read_config_dword(dev, PCI_BASE_ADDRESS_2, &bar2))
-    return ret;
-  printk(KERN_INFO "BAR2: %08x", bar2);
-  */
 
   // enable the PCI device
   if (pci_enable_device(dev))
@@ -117,8 +99,6 @@ static int ivshmem_probe(struct pci_dev *dev, const struct pci_device_id *id)
       goto out_free_vec;
     }
   }
-
-  printk(KERN_DEBUG "Successfully request irq with number %d", event_irq);
 
   return 0;
 
@@ -205,10 +185,7 @@ static int ivshmem_close(struct inode *i, struct file *f)
 static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
   // print ivposition and status
   uint32_t vmid, msg;
-  vmid = readl(regs + IVPosition);
-	printk("IVSHMEM: IVPosition is %d\n", vmid);
-  msg = readl(base_addr);
-  printk("IVSHMEM: read shared mem 0x%x\n", msg);
+  irq_arg i_arg;
 
   switch (cmd){
     case CMD_READ_SHMEM:
@@ -222,14 +199,14 @@ static long ivshmem_ioctl(struct file *f, unsigned int cmd, unsigned long arg){
         return -EACCES;
       break;
     case CMD_INTERRUPT:
-      printk(KERN_INFO "IVSHMEM: enter cmd interrupt");
-      if (copy_from_user(&vmid, (int *)arg, sizeof(int))){
+      if (copy_from_user(&i_arg, (irq_arg *)arg, sizeof(irq_arg))){
         return -EACCES;
       }
-      printk(KERN_INFO "IVSHMEM: read dest vmid from user %d", vmid);
-      msg = ((vmid & 0xffff) << 16) + (VECTOR_ID & 0xffff);
+      printk(KERN_INFO "IVSHMEM: read dest vmid from user %d", i_arg.dest_id);
+      msg = ((i_arg.dest_id & 0xffff) << 16) + (VECTOR_ID & 0xffff);
       printk(KERN_INFO "IVSHMEM: write 0x%x to Doorbell", msg);
       writel(msg, regs + Doorbell);
+      writel(i_arg.msg, base_addr);
       break;
   }
   return 0;

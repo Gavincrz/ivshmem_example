@@ -5,10 +5,8 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
+#include "../ivshmem_common.h"
 
-#define CMD_READ_SHMEM _IOR('i', 1, int)
-#define CMD_READ_VMID _IOR('i', 2, int)
-#define CMD_INTERRUPT _IOW('i', 3, int)
 
 void get_sharemem(int fd){
   int value;
@@ -18,7 +16,7 @@ void get_sharemem(int fd){
   }
   else
   {
-    printf("Status : Successfully get sharemem, %s\n", (char *)&value);
+    printf("Status : Successfully get sharemem, 0x%x\n", value);
   }
 }
 
@@ -34,9 +32,12 @@ void get_vmid(int fd){
   }
 }
 
-void send_interrupt(int fd, int dest_vm){
-  int dest = dest_vm;
-  if (ioctl(fd, CMD_INTERRUPT, &dest) != 0)
+void send_interrupt(int fd, int dest_vm, int msg){
+  irq_arg arg;
+  arg.dest_id = dest_vm;
+  arg.msg = msg;
+
+  if (ioctl(fd, CMD_INTERRUPT, &arg) != 0)
   {
     perror("failed to write to doorbell\n");
   }
@@ -53,9 +54,7 @@ int main(int argc, char *argv[])
   printf("command %ld, %ld, %ld\n",CMD_READ_SHMEM, CMD_READ_VMID, CMD_INTERRUPT);
 
   char *file_name = "/dev/ivshmem";
-  int fd;
-
-  int option;
+  int fd, msg, option;
   int dest_vm = 0;
 
   // parsing arguments
@@ -69,16 +68,17 @@ int main(int argc, char *argv[])
     else if (strcmp(argv[1], "-d") == 0){
       option = CMD_READ_VMID;
     }
-    else if ((strcmp(argv[1], "-i") == 0) && (argc == 3)){
+    else if ((strcmp(argv[1], "-i") == 0) && (argc == 4)){
       option = CMD_INTERRUPT;
       dest_vm = atoi(argv[2]);
+      msg = atoi(argv[3]);
       printf("destination vm id is %d \n", dest_vm);
     }
     else {
       printf("Usage: \n");
-      printf("sudo ./userctl -m                // get shmem content\n");
-      printf("sudo ./userctl -d                // get self vm id\n");
-      printf("sudo ./userctl -i <dest_vm>      // trigger interrupt to dest_vm\n");
+      printf("sudo ./userctl -m                     // get shmem content\n");
+      printf("sudo ./userctl -d                     // get self vm id\n");
+      printf("sudo ./userctl -i <dest_vm> <msg>     // trigger interrupt to dest_vm\n");
     }
   }
 
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
       get_vmid(fd);
       break;
     case CMD_INTERRUPT:
-      send_interrupt(fd, dest_vm);
+      send_interrupt(fd, dest_vm, msg);
       break;
     default:
       break;
