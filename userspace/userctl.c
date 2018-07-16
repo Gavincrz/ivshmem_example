@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
       send_interrupt(fd, dest_vm, msg);
       break;
     case option_poll:
-      wait_and_reply(fd);
+      wait_for_irq(fd);
       break;
     case option_commu:
       send_and_wait(fd, dest_vm);
