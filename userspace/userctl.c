@@ -14,6 +14,7 @@ typedef enum user_options {
   option_read_vmid,
   option_send_irq,
   option_poll,
+  option_wait,
   option_commu
 } user_options;
 
@@ -119,6 +120,9 @@ int main(int argc, char *argv[])
     else if (strcmp(argv[1], "-p") == 0){
       option = option_poll;
     }
+    else if (strcmp(argv[1], "-w") == 0){
+      option = option_wait;
+    }
     else if ((strcmp(argv[1], "-i") == 0) && (argc == 4)){
       option = option_send_irq;
       dest_vm = atoi(argv[2]);
@@ -135,6 +139,7 @@ int main(int argc, char *argv[])
       printf("sudo ./userctl -m                     // get shmem content\n");
       printf("sudo ./userctl -d                     // get self vm id\n");
       printf("sudo ./userctl -p                     // wait for interrupt and reply\n");
+      printf("sudo ./userctl -w                     // wait for interrupt\n");
       printf("sudo ./userctl -i <dest_vm> <msg>     // trigger interrupt to dest_vm\n");
       printf("sudo ./userctl -c <dest_vm>           // send selfid to dest_vm and wait for reply\n");
     }
@@ -159,6 +164,9 @@ int main(int argc, char *argv[])
       send_interrupt(fd, dest_vm, msg);
       break;
     case option_poll:
+      wait_and_reply(fd);
+      break;
+    case option_wait:
       wait_for_irq(fd);
       break;
     case option_commu:
